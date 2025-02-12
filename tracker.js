@@ -72,8 +72,8 @@ function preload() {
   ball[1] = loadImage('images/AFLBall.png');
   ball[2] = loadImage('images/AFLBall.png');
 
-  homePng = loadImage('images/irfu.png');  // home image (Ireland)
-  awayPng = loadImage('images/england.png');   // away image (England)
+  homePng = loadImage('images/AFLBall.png');  // home image (Ireland)
+  awayPng = loadImage('images/AFLBall.png');   // away image (England)
 }
 
 class Page {
