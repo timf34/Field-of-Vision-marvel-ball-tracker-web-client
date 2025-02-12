@@ -36,6 +36,7 @@ const stadiums = [
   'Demonstration',
   'Marvel Stadium',
   'Dalymount Park',
+  'Dublin'
 ];
 
 // WebSocket URLs
@@ -61,6 +62,7 @@ function preload() {
   images[0] = loadImage('images/Australia.png');
   images[1] = loadImage('images/Australia.png');
   images[2] = loadImage('images/Australia.png');
+  images[3] = loadImage('images/Australia.png');
 
   paused = loadImage('images/New Pause.png');
   rugbyPaused = loadImage('images/Pause.png');
@@ -414,7 +416,7 @@ class MainPage extends Page {
         url = DALYMOUNT_PARK;
         break;
       case 3: // Aviva Stadium
-        url = DALYMOUNT_PARK;
+        url = DUBLIN;
         imgIndex = 3;
         break;
       case 4: // Aviva - Dublin
