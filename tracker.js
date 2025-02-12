@@ -36,8 +36,6 @@ const stadiums = [
   'Demonstration',
   'Marvel Stadium',
   'Dalymount Park',
-  'Aviva Stadium',
-  'Aviva - Dublin',
 ];
 
 // WebSocket URLs
@@ -60,18 +58,17 @@ function preload() {
   myFont = loadFont('assets/arial.ttf');
   backgroundImg = loadImage('images/New Background.png');
 
-  images[0] = loadImage('images/pitch.png');
-  images[1] = loadImage('images/pitch.png');
-  images[2] = loadImage('images/pitch.png');
-  images[3] = loadImage('images/rugby pitch.png');
+  images[0] = loadImage('images/Australia.png');
+  images[1] = loadImage('images/Australia.png');
+  images[2] = loadImage('images/Australia.png');
 
   paused = loadImage('images/New Pause.png');
-  rugbyPaused = loadImage('images/rugby pause.png');
+  rugbyPaused = loadImage('images/Pause.png');
   goalImg = loadImage('images/goal.gif');
 
-  ball[0] = loadImage('images/Soccer.png');
+  ball[0] = loadImage('images/AFLBall.png');
   ball[1] = loadImage('images/AFLBall.png');
-  ball[2] = loadImage('images/CricketBall.png');
+  ball[2] = loadImage('images/AFLBall.png');
 
   homePng = loadImage('images/irfu.png');  // home image (Ireland)
   awayPng = loadImage('images/england.png');   // away image (England)
