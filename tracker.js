@@ -1,4 +1,4 @@
-// Global variables
+// Global variables  
 let pages = [];
 let currentPage;
 
@@ -6,13 +6,16 @@ let game;
 let mainMenu;
 let playbackPage;
 
-let images = [];
-let ball = [];
-let paused;
-let rugbyPaused;
-let goalImg;
-let homePng;
-let awayPng;
+let images = []; // pitch images
+
+// Sport–specific ball images (for possession indicators)
+let ballFootballHome, ballFootballAway;
+let ballAFLHome, ballAFLAway;
+let ballRugbyHome, ballRugbyAway;
+
+let paused;      // Football pause image
+let rugbyPaused; // Rugby pause image
+let aflPaused;   // AFL pause image
 
 let appWidth = 1200;
 let appHeight = 800;
@@ -36,7 +39,8 @@ const stadiums = [
   'Demonstration',
   'Marvel Stadium',
   'Dalymount Park',
-  'Dublin'
+  'Aviva Stadium',
+  'Aviva - Dublin',
 ];
 
 // WebSocket URLs
@@ -51,29 +55,40 @@ const POSSESSION_HOME_COLOUR = [255, 0, 0];
 const POSSESSION_AWAY = 0;
 const POSSESSION_AWAY_COLOUR = [0, 0, 255];
 
-// Font and images
+// Font and background image
 let myFont;
 let backgroundImg;
 
 function preload() {
   myFont = loadFont('assets/arial.ttf');
-  backgroundImg = loadImage('images/New Background.png');
+  backgroundImg = loadImage('images/background.png');
 
-  images[0] = loadImage('images/Australia.png');
-  images[1] = loadImage('images/Australia.png');
-  images[2] = loadImage('images/Australia.png');
-  images[3] = loadImage('images/Australia.png');
+  /* 
+    Setup pitch images:
+    - For Football (Demonstration & Dalymount Park): use "football pitch.png"
+    - For AFL (Marvel Stadium): use "afl pitch.png"
+    - For Rugby (Aviva Stadium & Aviva - Dublin): use "rugby pitch.png"
+  */
+  images[0] = loadImage('images/football pitch.png');  // Demonstration (Football)
+  images[1] = loadImage('images/afl pitch.png');         // Marvel Stadium (AFL)
+  images[2] = loadImage('images/football pitch.png');    // Dalymount Park (Football)
+  images[3] = loadImage('images/rugby pitch.png');       // Aviva Stadium / Aviva - Dublin (Rugby)
 
-  paused = loadImage('images/New Pause.png');
-  rugbyPaused = loadImage('images/Pause.png');
-  goalImg = loadImage('images/goal.gif');
+  // Load pause images based on sport:
+  paused = loadImage('images/football pause.png');
+  rugbyPaused = loadImage('images/rugby pause.png');
+  aflPaused = loadImage('images/afl pause.png');
 
-  ball[0] = loadImage('images/AFLBall.png');
-  ball[1] = loadImage('images/AFLBall.png');
-  ball[2] = loadImage('images/AFLBall.png');
-
-  homePng = loadImage('images/AFLBall.png');  // home image (Ireland)
-  awayPng = loadImage('images/AFLBall.png');   // away image (England)
+  // Load ball images for each sport (using the provided file names)
+  // For Football:
+  ballFootballHome = loadImage('images/football home.png');
+  ballFootballAway = loadImage('images/football away.png');
+  // For AFL:
+  ballAFLHome = loadImage('images/afl home.png');
+  ballAFLAway = loadImage('images/afl away.png');
+  // For Rugby:
+  ballRugbyHome = loadImage('images/rugby home.png');
+  ballRugbyAway = loadImage('images/rugby away.png');
 }
 
 class Page {
@@ -114,12 +129,11 @@ class Game extends Page {
     super();
     this.state = State.PAUSED;
     this.time = millis();
-    this.passKick = 0;     // Was "pass" in old code
-    this.tryScore = 0;     // Was "goal" in old code
-    this.conversion = 0;   // Was "C" in old code
-    this.ruck = 0;         // Was "R" in old code
-    this.scrumMaul = 0;    // Was "S" in old code
-
+    this.passKick = 0;     // Pass/Kick flag
+    this.tryScore = 0;     // For Football/AFL: "Goal"; for Rugby: "Try"
+    this.conversion = 0;   // For Rugby: Conversion; for AFL: "Behind"
+    this.ruck = 0;         // For Rugby: Ruck; for AFL: "Mark"
+    this.scrumMaul = 0;    // For Rugby: Scrum/Maul toggle
     this.home = 0;
     this.away = 0;
     this.tutorial = 0;
@@ -132,8 +146,9 @@ class Game extends Page {
     this.url = null;
     this.pausedImg = paused;
     this.sendCounter = 0;
+    this.sport = ""; // Set based on selectedImage index
 
-    // New: List of action messages to display
+    // List of action messages to display
     this.actionMessages = [];
   }
 
@@ -146,7 +161,18 @@ class Game extends Page {
     this.url = url;
     this.stadium = stadium;
     this.selectedImage = selectedImageIndex;
-    this.pausedImg = stadium === 'Aviva Stadium' ? rugbyPaused : paused;
+    // Determine sport based on selectedImage index:
+    // 0 and 2: Football, 1: AFL, 3: Rugby
+    if (selectedImageIndex === 0 || selectedImageIndex === 2) {
+      this.sport = "football";
+      this.pausedImg = paused;
+    } else if (selectedImageIndex === 1) {
+      this.sport = "AFL";
+      this.pausedImg = aflPaused;
+    } else if (selectedImageIndex === 3) {
+      this.sport = "rugby";
+      this.pausedImg = rugbyPaused;
+    }
 
     switch (url) {
       case DALYMOUNT_PARK:
@@ -172,7 +198,6 @@ class Game extends Page {
     const scaleFactorX = 102 / appWidth;
     const scaleFactorY = 64 / appHeight;
 
-    // Only single-letter fields in the JSON payload:
     return JSON.stringify({
       action: this.action,
       message: {
@@ -181,7 +206,7 @@ class Game extends Page {
         Y: parseFloat((constrainedY * scaleFactorY).toFixed(2)),
         P: this.possession,
         Pa: this.passKick,
-        G: this.tryScore,        // "G" now represents a Try in rugby!
+        G: this.tryScore,
         C: this.conversion,
         R: this.ruck,
         S: this.scrumMaul,
@@ -220,17 +245,49 @@ class Game extends Page {
 
     image(images[this.selectedImage], imgX, imgY, imgWidth, imgHeight);
 
-    // Instead, draw a small image at the mouse position.
-    const imgSize = 65; // Same as the original circle's diameter
+    // Draw the sport–specific ball image at the mouse position based on possession.
+    const imgSize = 65;
     if (this.possession === POSSESSION_HOME) {
-      image(homePng, mouseX - imgSize / 2, mouseY - imgSize / 2, imgSize, imgSize);
-    } else if (this.possession === POSSESSION_AWAY) {
-      image(awayPng, mouseX - imgSize / 2, mouseY - imgSize / 2, imgSize, imgSize);
+      if (this.sport === "football") {
+        image(ballFootballHome, mouseX - imgSize / 2, mouseY - imgSize / 2, imgSize, imgSize);
+      } else if (this.sport === "AFL") {
+        image(ballAFLHome, mouseX - imgSize / 2, mouseY - imgSize / 2, imgSize, imgSize);
+      } else if (this.sport === "rugby") {
+        image(ballRugbyHome, mouseX - imgSize / 2, mouseY - imgSize / 2, imgSize, imgSize);
+      }
+    } else {
+      if (this.sport === "football") {
+        image(ballFootballAway, mouseX - imgSize / 2, mouseY - imgSize / 2, imgSize, imgSize);
+      } else if (this.sport === "AFL") {
+        image(ballAFLAway, mouseX - imgSize / 2, mouseY - imgSize / 2, imgSize, imgSize);
+      } else if (this.sport === "rugby") {
+        image(ballRugbyAway, mouseX - imgSize / 2, mouseY - imgSize / 2, imgSize, imgSize);
+      }
     }
 
     if (this.state === State.PAUSED) {
       imageMode(CORNER);
       image(this.pausedImg, 0, 0, fixedWidth, fixedHeight);
+    }
+
+    // Display introductory instructions when tracking hasn't started (timestamp == 0)
+    if (this.state === State.PAUSED && this.timestamp === 0) {
+      push();
+      textAlign(CENTER, CENTER);
+      if (this.sport === "football") {
+        textSize(32);
+        textStyle(BOLD);
+        fill(255);
+        text("Controls/Actions: Pause/Play, Possession detection, Pass, Goal!", width / 2, height / 2 - 40);
+      } else if (this.sport === "AFL" || this.sport === "rugby") {
+        textSize(32);
+        textStyle(BOLD);
+        fill(255);
+        text("PRESS 'SPACE' TO START BALL TRACKING.", width / 2, height / 2 - 40);
+        textSize(20);
+        text("The ball on the device will mirror the movement of your mouse.", width / 2, height / 2);
+      }
+      pop();
     }
 
     push();
@@ -243,7 +300,6 @@ class Game extends Page {
     this.actionMessages = this.actionMessages.filter(msgObj => now < msgObj.expire);
     if (this.actionMessages.length > 0) {
       let message = this.actionMessages[this.actionMessages.length - 1].text.toUpperCase();
-      // Draw the text in a box spanning the entire canvas width
       text(message, 0, 55, width, 32.9);
     }
     pop();
@@ -262,64 +318,90 @@ class Game extends Page {
     const k = key.toUpperCase();
     if (k === 'E') return;
 
-    // Space toggles pause
+    // Space toggles pause/play
     if (k === ' ') {
       this.state = this.state === State.PAUSED ? State.ONGOING : State.PAUSED;
       if (this.state === State.PAUSED) this.checkpoint = this.timestamp;
       return;
     }
 
-    // Do not record events if game is paused
     if (this.state !== State.ONGOING) return;
 
-    /*
-      Rugby Key Mapping:
-      1 => Try (G=1)
-      2 => Conversion (C=1)
-      A => Pass/Kick (Pa=1)
-      D => Ruck (R=1)
-      F => Scrum/Maul (S= toggled)
-    */
-    switch (k) {
-      case '1':
-        this.tryScore = 1;
-        this.addActionMessage("Try", 4000); // Display "Try" for 4 seconds
+    // Sport–specific key mappings and on–screen messages:
+    switch(this.sport) {
+      case "football":
+        if (k === '1') {
+          this.tryScore = 1;
+          this.addActionMessage("Goal!", 4000);
+        } else if (k === 'A') {
+          this.passKick = 1;
+          this.addActionMessage("Pass", 500);
+        }
         break;
-      case '2':
-        this.conversion = 1;
-        this.addActionMessage("Conversion", 2000); // Display "Conversion" for 2 seconds
+      case "AFL":
+        if (k === '1') {
+          this.tryScore = 1;
+          this.addActionMessage("Goal", 4000);
+        } else if (k === '2') {
+          this.conversion = 1;
+          this.addActionMessage("Behind", 2000);
+        } else if (k === 'A') {
+          this.passKick = 1;
+          this.addActionMessage("Pass", 500);
+        } else if (k === 'D') {
+          this.ruck = 1;
+          this.addActionMessage("Mark", 500);
+        }
         break;
-      case 'A':
-        this.passKick = 1;
-        this.addActionMessage("Pass", 500); // Display "Pass" briefly
-        break;
-      case 'D':
-        this.ruck = 1;
-        this.addActionMessage("Ruck", 500); // Display "Ruck" briefly
-        break;
-      case 'F':
-        this.scrumMaul = this.scrumMaul === 0 ? 1 : 0;
-        if (this.scrumMaul === 1) {
-          this.addActionMessage("Scrum", 1000); // Display "Scrum" briefly when toggled on
+      case "rugby":
+        if (k === '1') {
+          this.tryScore = 1;
+          this.addActionMessage("Try", 4000);
+        } else if (k === '2') {
+          this.conversion = 1;
+          this.addActionMessage("Conversion", 2000);
+        } else if (k === 'A') {
+          this.passKick = 1;
+          this.addActionMessage("Pass", 500);
+        } else if (k === 'D') {
+          this.ruck = 1;
+          this.addActionMessage("Ruck", 500);
+        } else if (k === 'F') {
+          this.scrumMaul = this.scrumMaul === 0 ? 1 : 0;
+          if (this.scrumMaul === 1) {
+            this.addActionMessage("Scrum", 1000);
+          }
         }
         break;
     }
   }
 
   handleMousePressed(event) {
-    // Left-click toggles possession: home(1) / away(0)
+    // Left-click toggles possession.
     if (event.button === 0) {
       this.possession = this.possession === POSSESSION_HOME ? POSSESSION_AWAY : POSSESSION_HOME;
     }
-    // Middle-click or wheel-click triggers a Pass/Kick
+    // Middle-click (wheel-click) triggers a Pass action.
     if (event.button === 4) {
       this.passKick = 1;
       this.addActionMessage("Pass", 500);
     }
-    // Right-click triggers a Try
+    // Right-click triggers the scoring action—label depends on the sport.
     if (event.button === 2 || event.button === 3) {
-      this.tryScore = 1;
-      this.addActionMessage("Try", 4000);
+      switch(this.sport) {
+        case "football":
+          this.tryScore = 1;
+          this.addActionMessage("Goal!", 4000);
+          break;
+        case "AFL":
+          this.tryScore = 1;
+          this.addActionMessage("Goal", 4000);
+          break;
+        case "rugby":
+          this.tryScore = 1;
+          this.addActionMessage("Try", 4000);
+          break;
+      }
     }
   }
 
@@ -404,22 +486,28 @@ class MainPage extends Page {
     let url = null;
     let imgIndex = 0;
     
+    // Map each stadium to its appropriate URL and pitch image:
+    // - Demonstration and Dalymount Park: Football
+    // - Marvel Stadium: AFL
+    // - Aviva Stadium and Aviva - Dublin: Rugby
     switch (selectedStadium) {
-      case 0: // Demonstration
-      url = DALYMOUNT_PARK;
+      case 0: // Demonstration (Football)
+        url = DALYMOUNT_PARK;
         imgIndex = 0;
         break;
-      case 1:
+      case 1: // Marvel Stadium (AFL)
         url = MARVEL_STADIUM;
+        imgIndex = 1;
         break;
-      case 2:
+      case 2: // Dalymount Park (Football)
         url = DALYMOUNT_PARK;
+        imgIndex = 0;
         break;
-      case 3: // Aviva Stadium
+      case 3: // Aviva Stadium (Rugby)
         url = DUBLIN;
         imgIndex = 3;
         break;
-      case 4: // Aviva - Dublin
+      case 4: // Aviva - Dublin (Rugby)
         url = DUBLIN;
         imgIndex = 3;
         break;
@@ -429,7 +517,7 @@ class MainPage extends Page {
       game.setStadium(url, stadiumName, imgIndex);
       console.log(`Selected stadium: ${stadiumName}, Image index: ${imgIndex}`);
     }
-    if (playbackPage) playbackPage.setStadium(url, stadiumName);
+    if (playbackPage) playbackPage.setStadium(url, stadiumName, imgIndex);
   }
 
   show() {
@@ -487,10 +575,17 @@ class PlaybackPage extends Page {
     this.url = url;
     this.stadium = stadium;
     this.selectedImage = selectedImageIndex;
-    
-    // Only use rugby pause for Aviva
-    this.pausedImg = (stadium === 'Aviva Stadium') ? rugbyPaused : paused;
-
+    if (selectedImageIndex === 0 || selectedImageIndex === 2) {
+      this.sport = "football";
+      this.pausedImg = paused;
+    } else if (selectedImageIndex === 1) {
+      this.sport = "AFL";
+      this.pausedImg = aflPaused;
+    } else if (selectedImageIndex === 3) {
+      this.sport = "rugby";
+      this.pausedImg = rugbyPaused;
+    }
+  
     switch (url) {
       case DALYMOUNT_PARK:
         this.action = 'dalymount_IRL_sendMessage';
@@ -503,6 +598,7 @@ class PlaybackPage extends Page {
         break;
     }
   }
+  
 
   start() {
     webConnect(this.url);
@@ -541,7 +637,6 @@ class PlaybackPage extends Page {
     if (!this.jsonArray || this.isPaused) return;
 
     if (this.counter >= this.jsonSize) {
-      // Restart from the beginning once finished
       this.counter = 0;
       this.startPlaybackTime = millis();
       this.totalPausedDuration = 0;
@@ -557,8 +652,6 @@ class PlaybackPage extends Page {
     }
   }
 
-  // We keep single-letter keys in the JSON,
-  // but note that "G" is a Try, "Pa" is Pass/Kick, etc.
   sendJsonEntry(entry) {
     let msg = JSON.stringify({
       action: this.action,
@@ -578,7 +671,6 @@ class PlaybackPage extends Page {
   }
 }
 
-// Web communication code
 let requests = [];
 let socket = null;
 let url = null;
@@ -670,7 +762,6 @@ function keyPressed() {
 
 function mousePressed(event) {
   if (currentPage?.handleMousePressed) currentPage.handleMousePressed(event);
-  // Prevent default context menu on right/middle click if desired
   if (event.button === 4 || event.button === 2 || event.button === 3) {
     event.preventDefault();
   }
