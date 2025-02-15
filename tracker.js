@@ -174,6 +174,9 @@ class Game extends Page {
       this.pausedImg = rugbyPaused;
     }
 
+    // New debug log added
+    console.log(`Game.setStadium() called - stadium: ${stadium}, selectedImage: ${selectedImageIndex}, sport: ${this.sport}`);
+
     switch (url) {
       case DALYMOUNT_PARK:
         this.action = 'dalymount_IRL_sendMessage';
@@ -268,26 +271,6 @@ class Game extends Page {
     if (this.state === State.PAUSED) {
       imageMode(CORNER);
       image(this.pausedImg, 0, 0, fixedWidth, fixedHeight);
-    }
-
-    // Display introductory instructions when tracking hasn't started (timestamp == 0)
-    if (this.state === State.PAUSED && this.timestamp === 0) {
-      push();
-      textAlign(CENTER, CENTER);
-      if (this.sport === "football") {
-        textSize(32);
-        textStyle(BOLD);
-        fill(255);
-        text("Controls/Actions: Pause/Play, Possession detection, Pass, Goal!", width / 2, height / 2 - 40);
-      } else if (this.sport === "AFL" || this.sport === "rugby") {
-        textSize(32);
-        textStyle(BOLD);
-        fill(255);
-        text("PRESS 'SPACE' TO START BALL TRACKING.", width / 2, height / 2 - 40);
-        textSize(20);
-        text("The ball on the device will mirror the movement of your mouse.", width / 2, height / 2);
-      }
-      pop();
     }
 
     push();
@@ -459,6 +442,9 @@ class MainPage extends Page {
     this.stadiumList.changed(() => this.onClickList());
     this.controllers.push(this.stadiumList);
 
+    this.stadiumList.value(0); // Set the default to index 0 ("Demonstration")
+    this.onSelectStadium(0);   // Manually trigger the selection for Demonstration
+
     this.startButton = createButton(START_LABEL);
     this.startButton.parent('ui-container');
     this.startButton.class('start-button');
@@ -504,7 +490,7 @@ class MainPage extends Page {
         imgIndex = 0;
         break;
       case 3: // Aviva Stadium (Rugby)
-        url = DUBLIN;
+        url = DALYMOUNT_PARK;
         imgIndex = 3;
         break;
       case 4: // Aviva - Dublin (Rugby)
